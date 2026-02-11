@@ -6,7 +6,7 @@
  * https://github.com/KadenThomp36/air-quality-card
  */
 
-const CARD_VERSION = '2.1.0';
+const CARD_VERSION = '2.2.0';
 
 class AirQualityCard extends HTMLElement {
   // Visual editor using getConfigForm (preferred modern approach)
@@ -35,6 +35,7 @@ class AirQualityCard extends HTMLElement {
             { name: 'air_quality_entity', selector: { entity: { domain: 'sensor' } } },
             { name: 'recommendation_entity', selector: { entity: { domain: 'sensor' } } },
             { name: 'hours_to_show', selector: { number: { min: 1, max: 168, mode: 'box', unit_of_measurement: 'hours' } } },
+            { name: 'temperature_unit', selector: { select: { options: [{ value: 'F', label: 'Fahrenheit (°F)' }, { value: 'C', label: 'Celsius (°C)' }], mode: 'dropdown' } } },
           ]
         }
       ],
@@ -47,7 +48,8 @@ class AirQualityCard extends HTMLElement {
           temperature_entity: 'Temperature Sensor (optional)',
           air_quality_entity: 'Air Quality Index (optional)',
           recommendation_entity: 'Recommendation Sensor (optional)',
-          hours_to_show: 'Graph History'
+          hours_to_show: 'Graph History',
+          temperature_unit: 'Temperature Unit'
         };
         return labels[schema.name] || schema.name;
       }
@@ -89,6 +91,7 @@ class AirQualityCard extends HTMLElement {
     this._config = {
       name: 'Air Quality',
       hours_to_show: 24,
+      temperature_unit: 'F',
       ...config
     };
     this._rendered = false;
@@ -204,7 +207,22 @@ class AirQualityCard extends HTMLElement {
     return '#ff9800';
   }
 
+  _isCelsius() {
+    return this._config.temperature_unit === 'C';
+  }
+
+  _getTempUnit() {
+    return this._isCelsius() ? '°C' : '°F';
+  }
+
   _getTempColor(value) {
+    if (this._isCelsius()) {
+      if (value < 18) return '#2196f3';
+      if (value < 20) return '#03a9f4';
+      if (value < 22) return '#4caf50';
+      if (value < 24) return '#ff9800';
+      return '#f44336';
+    }
     if (value < 65) return '#2196f3';
     if (value < 68) return '#03a9f4';
     if (value < 72) return '#4caf50';
@@ -571,7 +589,7 @@ class AirQualityCard extends HTMLElement {
             <div class="graph-container" id="temperature-graph-container" data-entity="${this._config.temperature_entity}">
               <div class="graph-header">
                 <span class="graph-label">Temperature</span>
-                <span class="graph-value" id="temperature-value">-- <span class="unit">°F</span><span class="status" id="temperature-status"></span></span>
+                <span class="graph-value" id="temperature-value">-- <span class="unit">${this._getTempUnit()}</span><span class="status" id="temperature-status"></span></span>
               </div>
               <div class="graph-wrapper">
                 <div class="graph" id="temperature-graph">
@@ -704,15 +722,23 @@ class AirQualityCard extends HTMLElement {
     // Update Temperature
     if (temp !== null) {
       const tempColor = this._getTempColor(temp);
+      const tempUnit = this._getTempUnit();
       const tempValueEl = this.shadowRoot.getElementById('temperature-value');
       if (tempValueEl) {
-        tempValueEl.innerHTML = `${Math.round(temp)} <span class="unit">°F</span><span class="status" id="temperature-status"></span>`;
+        tempValueEl.innerHTML = `${Math.round(temp)} <span class="unit">${tempUnit}</span><span class="status" id="temperature-status"></span>`;
         const statusEl = tempValueEl.querySelector('.status');
         let tempStatus = 'Comfortable';
-        if (temp < 65) tempStatus = 'Cold';
-        else if (temp < 68) tempStatus = 'Cool';
-        else if (temp > 76) tempStatus = 'Hot';
-        else if (temp > 72) tempStatus = 'Warm';
+        if (this._isCelsius()) {
+          if (temp < 18) tempStatus = 'Cold';
+          else if (temp < 20) tempStatus = 'Cool';
+          else if (temp > 24) tempStatus = 'Hot';
+          else if (temp > 22) tempStatus = 'Warm';
+        } else {
+          if (temp < 65) tempStatus = 'Cold';
+          else if (temp < 68) tempStatus = 'Cool';
+          else if (temp > 76) tempStatus = 'Hot';
+          else if (temp > 72) tempStatus = 'Warm';
+        }
         statusEl.textContent = tempStatus;
         statusEl.style.background = tempColor + '22';
         statusEl.style.color = tempColor;
@@ -734,7 +760,10 @@ class AirQualityCard extends HTMLElement {
       this._renderGraph('humidity', this._history.humidity, this._getHumidityColor.bind(this), 0, 100, '%');
     }
     if (this._config.temperature_entity && this._history.temperature.length) {
-      this._renderGraph('temperature', this._history.temperature, this._getTempColor.bind(this), 50, 90, '°F');
+      const tempUnit = this._getTempUnit();
+      const tempMin = this._isCelsius() ? 10 : 50;
+      const tempMax = this._isCelsius() ? 32 : 90;
+      this._renderGraph('temperature', this._history.temperature, this._getTempColor.bind(this), tempMin, tempMax, tempUnit);
     }
 
     this._setupGraphInteractions();
@@ -915,7 +944,7 @@ class AirQualityCard extends HTMLElement {
     if (valueEl) {
       let displayValue;
       if (data.unit === 'ppm') displayValue = Math.round(closest.value);
-      else if (data.unit === '%' || data.unit === '°F') displayValue = Math.round(closest.value);
+      else if (data.unit === '%' || data.unit === '°F' || data.unit === '°C') displayValue = Math.round(closest.value);
       else displayValue = closest.value.toFixed(1);
       valueEl.textContent = `${displayValue} ${data.unit}`;
       valueEl.style.color = closest.color;
@@ -975,6 +1004,7 @@ if (LitElement && !customElements.get('air-quality-card-editor')) {
       this._config = {
         name: 'Air Quality',
         hours_to_show: 24,
+        temperature_unit: 'F',
         ...config
       };
     }
@@ -988,7 +1018,8 @@ if (LitElement && !customElements.get('air-quality-card-editor')) {
         temperature_entity: 'Temperature Sensor (optional)',
         air_quality_entity: 'Air Quality Index (optional)',
         recommendation_entity: 'Recommendation Sensor (optional)',
-        hours_to_show: 'Graph History (hours)'
+        hours_to_show: 'Graph History (hours)',
+        temperature_unit: 'Temperature Unit'
       };
       return labels[schema.name] || schema.name;
     }
@@ -1002,7 +1033,8 @@ if (LitElement && !customElements.get('air-quality-card-editor')) {
         { name: 'temperature_entity', selector: { entity: { domain: 'sensor' } } },
         { name: 'air_quality_entity', selector: { entity: { domain: 'sensor' } } },
         { name: 'recommendation_entity', selector: { entity: { domain: 'sensor' } } },
-        { name: 'hours_to_show', selector: { number: { min: 1, max: 168, mode: 'box' } } }
+        { name: 'hours_to_show', selector: { number: { min: 1, max: 168, mode: 'box' } } },
+        { name: 'temperature_unit', selector: { select: { options: [{ value: 'F', label: 'Fahrenheit (°F)' }, { value: 'C', label: 'Celsius (°C)' }], mode: 'dropdown' } } }
       ];
     }
 

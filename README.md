@@ -55,6 +55,7 @@ temperature_entity: sensor.air_quality_temperature
 air_quality_entity: sensor.air_quality_index
 recommendation_entity: sensor.air_quality_recommendation
 hours_to_show: 24
+temperature_unit: C
 ```
 
 ### Configuration Options
@@ -69,6 +70,7 @@ hours_to_show: 24
 | `air_quality_entity` | string | No | - | Overall air quality index entity |
 | `recommendation_entity` | string | No | - | Recommendation template sensor |
 | `hours_to_show` | number | No | 24 | Hours of history to display (1-168) |
+| `temperature_unit` | string | No | "F" | Temperature unit: "F" (Fahrenheit) or "C" (Celsius) |
 
 ## Recommendation Sensor
 
